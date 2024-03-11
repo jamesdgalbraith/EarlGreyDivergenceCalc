@@ -27,6 +27,8 @@ parser.add_argument('-tmp', '--temp_dir', type=str, default='tmp/',
                     help='Temporary directory')
 parser.add_argument('-t', '--cores', type=int, default=4,
                     help='Number of cores')
+parser.add_argument('-k', '--timeout', type=int, default=30,
+                    help='Seconds after which water will be cancelled and repeat treated as unalignable')
 
 args = parser.parse_args()
 
@@ -92,7 +94,7 @@ def Kimura80(qseq, sseq):
     
     return(Kimura_dist)
 
-def outer_func(genome_path, temp_dir, gff):
+def outer_func(genome_path, temp_dir, timeoutSeconds, gff):
     generated_name = file_name_generator()
     holder_file_name = temp_dir+generated_name
     failed_file_name = temp_dir+"failed_"+generated_name
@@ -116,7 +118,6 @@ def outer_func(genome_path, temp_dir, gff):
             subject_path=temp_dir+"/split_library/"+repeat_family+".fasta"
             # Run water, with timeout exception
             test_command = shlex.split("water "+query_path+" "+subject_path+" -gapopen 10 -gapextend 0.5 -outfile "+query_path+".water -aformat fasta")
-            timeoutSeconds = 30
             # Run test and kill if it takes more than 10 seconds
             alignment_p = subprocess.Popen(test_command, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
             try:
@@ -197,7 +198,7 @@ if __name__ == "__main__":
 
     print("Starting calculations") 
     # Peform calulations in parallel
-    func = partial(outer_func, args.genome, args.temp_dir)
+    func = partial(outer_func, args.genome, args.temp_dir, args.timeout)
     pool = multiprocessing.Pool(processes=num_processes)
     results = pool.map(func, chunks)
     pool.close()
