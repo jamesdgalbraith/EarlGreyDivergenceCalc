@@ -61,8 +61,10 @@ divergence_eg_tes_rounded_for_plot  <- divergence_eg_tes_gff %>%
 
 # Set fill colours
 fill_colours <- tibble(subclass = c("DNA", "LINE", "LTR", "PLE", "RC", "SINE", "Other", "Unknown"),
+                       named_subclass = c("DNA Transposon", "LINE", "LTR Retrotransposon", "Penelope", "Rolling Circle", "SINE", "Other", "Unknown"),
                        fill_colour = c("#E32017", "#0098D4", "#00782A", "#7156A5", "#EE7C0E", "#9B0056", "#F3A9BB", "#A0A5A9")) %>%
-  filter(subclass %in% divergence_eg_tes_rounded_for_plot$subclass)
+  filter(subclass %in% divergence_eg_tes_rounded_for_plot$subclass) %>%
+  arrange(named_subclass)
 
 # Create and save main plots
 kimura_plot <- ggplot(divergence_eg_tes_rounded_for_plot,
