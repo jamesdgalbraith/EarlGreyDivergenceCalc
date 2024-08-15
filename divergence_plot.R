@@ -4,7 +4,7 @@ option_list <- list(
   make_option(c("-s", "--species_name"), default=NA, type = "character", help="Species name (required)"),
   make_option(c("-g", "--in_gff"), default=NA, type = "character", help="GFF with Kimura distances (required)"),
   make_option(c("-o", "--out_directory"), default=NA, type = "character", help="Directory to write plots to (required)"),
-  make_option(c("-f", "--axis_flip"), default=FALSE, type = "logical", help="Flip x-axis on plots"),
+  make_option(c("-f", "--axis_flip"), default=FALSE, type = "logical", help="Flip x-axis on plots")
 )
 
 opt <- parse_args(OptionParser(option_list=option_list))
