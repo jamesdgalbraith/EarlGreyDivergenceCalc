@@ -3,7 +3,8 @@ library(optparse)
 option_list <- list(
   make_option(c("-s", "--species_name"), default=NA, type = "character", help="Species name (required)"),
   make_option(c("-g", "--in_gff"), default=NA, type = "character", help="GFF with Kimura distances (required)"),
-  make_option(c("-o", "--out_directory"), default=NA, type = "character", help="Directory to write plots to (required)")
+  make_option(c("-o", "--out_directory"), default=NA, type = "character", help="Directory to write plots to (required)"),
+  make_option(c("-f", "--axis_flip"), default=FALSE, type = "logical", help="Flip x-axis on plots"),
 )
 
 opt <- parse_args(OptionParser(option_list=option_list))
@@ -25,14 +26,17 @@ suppressPackageStartupMessages(library(viridis))
 suppressPackageStartupMessages(library(cowplot))
 suppressPackageStartupMessages(library(ggtext))
 
+# set variables
+species_name=opt$species_name
+in_gff=opt$in_gff
+out_directory=opt$out_directory
+
 # Created plot title
-plot_title <- paste0("Repeat landscape of *", gsub("_", " ", opt$species_name), "*")
+plot_title <- paste0("Repeat landscape of *", gsub("_", " ", species_name), "*")
 title_plot <- ggplot() + labs(title = plot_title) + theme(plot.title = element_markdown(hjust = 0.5)) + theme(panel.background = element_blank())
 
-# Read in data, remove repeats which Kimura was not calculated for
-divergence_eg_gff <- read_gff(opt$in_gff) %>%
-  mutate(KIMURA80 = as.double(KIMURA80)) %>%
-  filter(!is.na(KIMURA80), KIMURA80 <= 0.5)
+# Read in data
+divergence_eg_gff <- read_gff(in_gff)
 
 # Breakdown classification of repeats
 divergence_eg_tes_gff <- divergence_eg_gff %>%
@@ -49,8 +53,37 @@ divergence_eg_tes_gff <- divergence_eg_tes_gff %>%
                                            subclass == "RC" ~ "Rolling Circle",
                                            .default = subclass))
 
-# Sum lengths to create data for plots (remove subclasses not in standard set)
+# Create summary of families
+summary_table <- divergence_eg_tes_gff %>%
+  as_tibble %>%
+  group_by(ID) %>%
+  dplyr::select(-seqnames, -start, -end, -strand, -source,
+                -score, -phase, -TSTART, -TEND, -SHORTTE, -Matches,
+                -MISMATCHES, -TEGROUP, -LTRGROUP, -named_subclass, -type) %>%
+  mutate(total_bp = sum(width),
+         mean_width = mean(width),
+         min_width = min(width),
+         max_width = max(width),
+         sd_width = sd(width),
+         div = as.numeric(KIMURA80),
+         mean_div = mean(div),
+         min_div = min(div),
+         max_div = max(div),
+         sd_div = sd(div)
+  ) %>%
+  dplyr::select(-width, -div, -KIMURA80) %>%
+  base::unique() %>%
+  dplyr::arrange(subclass, superfamily, ID) %>%
+  dplyr::rename(family = ID)
+
+# Save summary to file
+readr::write_tsv(x = summary_table, file = paste0(out_directory, "/", species_name, "_summary_table.tsv"))
+
+# Sum lengths to create data for plots (remove subclasses not in standard set and repeats which Kimura was not calculated for)
 divergence_eg_tes_rounded_for_plot  <- divergence_eg_tes_gff %>%
+  filter(!is.na(KIMURA80)) %>%
+  mutate(KIMURA80 = as.numeric(KIMURA80)) %>%
+  dplyr::filter(KIMURA80 <= 0.5) %>%
   as_tibble() %>%
   dplyr::mutate(KIMURA80 = round(x = KIMURA80, digits = 2)) %>%
   group_by(named_subclass, KIMURA80) %>%
@@ -65,30 +98,55 @@ fill_colours <- tibble(subclass = c("DNA", "LINE", "LTR", "PLE", "RC", "SINE", "
                        named_subclass = c("DNA Transposon", "LINE", "LTR Retrotransposon", "Penelope", "Rolling Circle", "SINE", "Other", "Unknown"),
                        fill_colour = c("#E32017", "#0098D4", "#00782A", "#7156A5", "#EE7C0E", "#9B0056", "#F3A9BB", "#A0A5A9")) %>%
   filter(subclass %in% divergence_eg_tes_rounded_for_plot$subclass) %>%
-  arrange(named_subclass)
+  arrange(named_subclass) %>%
+  filter(subclass %in% divergence_eg_tes_rounded_for_plot$subclass)
 
 # Create and save main plots
 kimura_plot <- ggplot(divergence_eg_tes_rounded_for_plot,
                       aes(x = KIMURA80, y = KIMURA_SUM, fill = named_subclass)) +
   geom_col(position = "stack", width = 0.01) +
-  scale_x_continuous(limits = c(-0.01, 0.51),
-                     expand = c(0,0), name = "Kimura 2-Parameter Distance") +
   theme_bw() +
   labs(title = plot_title) + theme(plot.title = element_markdown(hjust = 0.5)) +
   scale_fill_manual(values = fill_colours$fill_colour, name = "TE Subclass")
 subclass_kimura_plot <- kimura_plot + scale_y_continuous(expand = c(0.01,0), name = "Base pairs")
-ggsave(plot = subclass_kimura_plot, filename = paste0(opt$out_directory, "/", opt$species_name, "_subclass_div_plot.pdf"), device = "pdf", width = 12.85, height = 8.5)
+# Flip axis if desired
+if(opt$axis_flip == TRUE){
+  subclass_kimura_plot <- subclass_kimura_plot +
+    scale_x_continuous(limits = c(-0.01, 0.51),
+                       expand = c(0,0), name = "Kimura 2-Parameter Distance",
+                       trans = "reverse")
+} else {
+  subclass_kimura_plot <- subclass_kimura_plot +
+    scale_x_continuous(limits = c(-0.01, 0.51),
+                       expand = c(0,0), name = "Kimura 2-Parameter Distance")
+}
+ggsave(plot = subclass_kimura_plot, filename = paste0(out_directory, "/", species_name, "_subclass_div_plot.pdf"), device = "pdf", width = 12.85, height = 8.5)
+
 split_subclass_kimura_plot <- kimura_plot + scale_y_continuous(name = "Base pairs", labels = function(x) format(x, scientific = TRUE)) + facet_grid(subclass~., scales = "free")
-ggsave(plot = split_subclass_kimura_plot, filename = paste0(opt$out_directory, "/", opt$species_name, "_split_subclass_div_plot.pdf"), device = "pdf", width = 12.85, height = 8.5)
+# Flip axis if desired
+if(opt$axis_flip == TRUE){
+  split_subclass_kimura_plot <- split_subclass_kimura_plot +
+    scale_x_continuous(limits = c(-0.01, 0.51),
+                       expand = c(0,0), name = "Kimura 2-Parameter Distance",
+                       trans = "reverse")
+} else {
+  split_subclass_kimura_plot <- split_subclass_kimura_plot +
+    scale_x_continuous(limits = c(-0.01, 0.51),
+                       expand = c(0,0), name = "Kimura 2-Parameter Distance")
+}
+ggsave(plot = split_subclass_kimura_plot, filename = paste0(out_directory, "/", species_name, "_split_subclass_div_plot.pdf"), device = "pdf", width = 12.85, height = 8.5)
 
 # Perform maths for more divided plot
 divergence_eg_tes_rounded_for_superfamily_plot  <- divergence_eg_tes_gff %>%
   as_tibble() %>%
+  filter(!is.na(KIMURA80)) %>%
+  mutate(KIMURA80 = as.numeric(KIMURA80)) %>%
+  dplyr::filter(KIMURA80 <= 0.5) %>%
   dplyr::mutate(KIMURA80 = round(x = KIMURA80, digits = 2),
                 type = sub("-.*", "", type)) %>%
   group_by(superfamily, KIMURA80) %>%
   mutate(KIMURA_SUM = sum(width)) %>%
-  ungroup()%>%
+  ungroup() %>%
   dplyr::select(type, subclass, superfamily, KIMURA80, KIMURA_SUM) %>%
   base::unique() %>%
   arrange(subclass, superfamily, KIMURA80)
@@ -101,8 +159,6 @@ divergence_eg_tes_rounded_for_superfamily_plot <- split(divergence_eg_tes_rounde
 kimura_superfamily_plot_1 <- ggplot(divergence_eg_tes_rounded_for_superfamily_plot$DNA,
                                     aes(x = KIMURA80, y = KIMURA_SUM, fill = superfamily)) +
   geom_col(position = "stack", width = 0.01, colour = "black", linewidth = 0.2) +
-  scale_x_continuous(limits = c(-0.01, 0.51),
-                     expand = c(0,0), name = "") +
   theme_bw() +
   theme(legend.title=element_blank()) +
   scale_y_continuous(name = "Base pairs", labels = function(x) format(x, scientific = TRUE)) +
@@ -111,8 +167,6 @@ kimura_superfamily_plot_1 <- ggplot(divergence_eg_tes_rounded_for_superfamily_pl
 kimura_superfamily_plot_2 <- ggplot(divergence_eg_tes_rounded_for_superfamily_plot$LINE,
                                     aes(x = KIMURA80, y = KIMURA_SUM, fill = superfamily)) +
   geom_col(position = "stack", width = 0.01, colour = "black", linewidth = 0.2) +
-  scale_x_continuous(limits = c(-0.01, 0.51),
-                     expand = c(0,0), name = "") +
   theme_bw() +
   theme(legend.title=element_blank()) +
   scale_y_continuous(name = "Base pairs", labels = function(x) format(x, scientific = TRUE)) +
@@ -122,8 +176,6 @@ kimura_superfamily_plot_2 <- ggplot(divergence_eg_tes_rounded_for_superfamily_pl
 kimura_superfamily_plot_3 <- ggplot(divergence_eg_tes_rounded_for_superfamily_plot$LTR,
                                     aes(x = KIMURA80, y = KIMURA_SUM, fill = superfamily)) +
   geom_col(position = "stack", width = 0.01, colour = "black", linewidth = 0.2) +
-  scale_x_continuous(limits = c(-0.01, 0.51),
-                     expand = c(0,0), name = "") +
   theme_bw() +
   theme(legend.title=element_blank()) +
   scale_y_continuous(name = "Base pairs", labels = function(x) format(x, scientific = TRUE)) +
@@ -133,8 +185,6 @@ kimura_superfamily_plot_3 <- ggplot(divergence_eg_tes_rounded_for_superfamily_pl
 kimura_superfamily_plot_4 <- ggplot(divergence_eg_tes_rounded_for_superfamily_plot$SINE,
                                     aes(x = KIMURA80, y = KIMURA_SUM, fill = superfamily)) +
   geom_col(position = "stack", width = 0.01, colour = "black", linewidth = 0.2) +
-  scale_x_continuous(limits = c(-0.01, 0.51),
-                     expand = c(0,0), name = "Kimura 2-Parameter Distance") +
   theme_bw() +
   theme(legend.title=element_blank()) +
   scale_y_continuous(name = "Base pairs", labels = function(x) format(x, scientific = TRUE)) +
@@ -142,11 +192,40 @@ kimura_superfamily_plot_4 <- ggplot(divergence_eg_tes_rounded_for_superfamily_pl
   guides(fill=guide_legend(ncol=3)) +
   scale_fill_brewer(palette = "YlOrRd", direction = -1)
 
+# flip axis if desired
+# Flip axis if desired
+if(opt$axis_flip == TRUE){
+  kimura_superfamily_plot_1 <- kimura_superfamily_plot_1 +
+    scale_x_continuous(limits = c(-0.01, 0.51),
+                       expand = c(0,0), name = "", trans = "reverse")
+  kimura_superfamily_plot_2 <- kimura_superfamily_plot_2 +
+    scale_x_continuous(limits = c(-0.01, 0.51),
+                       expand = c(0,0), name = "", trans = "reverse")
+  kimura_superfamily_plot_3 <- kimura_superfamily_plot_3 +
+    scale_x_continuous(limits = c(-0.01, 0.51),
+                       expand = c(0,0), name = "", trans = "reverse")
+  kimura_superfamily_plot_4 <- kimura_superfamily_plot_4 +
+    scale_x_continuous(limits = c(-0.01, 0.51), trans = "reverse",
+                       expand = c(0,0), name = "Kimura 2-Parameter Distance")
+} else {
+  kimura_superfamily_plot_1 <- kimura_superfamily_plot_1 +
+    scale_x_continuous(limits = c(-0.01, 0.51),
+                       expand = c(0,0), name = "")
+  kimura_superfamily_plot_2 <- kimura_superfamily_plot_2 +
+    scale_x_continuous(limits = c(-0.01, 0.51),
+                       expand = c(0,0), name = "")
+  kimura_superfamily_plot_3 <- kimura_superfamily_plot_3 +
+    scale_x_continuous(limits = c(-0.01, 0.51),
+                       expand = c(0,0), name = "")
+  kimura_superfamily_plot_4 <- kimura_superfamily_plot_4 +
+    scale_x_continuous(limits = c(-0.01, 0.51),
+                       expand = c(0,0), name = "Kimura 2-Parameter Distance")
+}
+
 # Combine plots and title
 superfamily_kimura_plot <- plot_grid(kimura_superfamily_plot_1, kimura_superfamily_plot_2, kimura_superfamily_plot_3, kimura_superfamily_plot_4, 
-          ncol = 1, align = "v")
+                                     ncol = 1, align = "v")
 superfamily_kimura_plot_titled <- plot_grid(title_plot, superfamily_kimura_plot, ncol = 1, rel_heights = c(1, 30))
 
 # Save divided plot
-ggsave(plot = superfamily_kimura_plot_titled, filename = paste0(opt$out_directory, "/", opt$species_name, "_superfamily_div_plot.pdf"), device = "pdf", width = 12.85, height = 8.5)
-
+ggsave(plot = superfamily_kimura_plot_titled, filename = paste0(out_directory, "/", species_name, "_superfamily_div_plot.pdf"), device = "pdf", width = 12.85, height = 8.5)
