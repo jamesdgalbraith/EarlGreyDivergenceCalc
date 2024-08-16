@@ -1,10 +1,14 @@
 library(optparse)
 
 option_list <- list(
-  make_option(c("-s", "--species_name"), default=NA, type = "character", help="Species name (required)"),
-  make_option(c("-g", "--in_gff"), default=NA, type = "character", help="GFF with Kimura distances (required)"),
-  make_option(c("-o", "--out_directory"), default=NA, type = "character", help="Directory to write plots to (required)"),
-  make_option(c("-f", "--axis_flip"), default=FALSE, type = "logical", help="Flip x-axis on plots")
+  make_option(c("-s", "--species_name"), default=NA, type = "character",
+                help="Species name (required)"),
+  make_option(c("-g", "--in_gff"), default=NA, type = "character",
+                help="GFF with Kimura distances (required)"),
+  make_option(c("-o", "--out_directory"), default=NA, type = "character",
+                help="Directory to write plots to (required)"),
+  make_option(c("-f", "--axis_flip"), action = "store_true",
+                default=FALSE, type = "logical", help="Flip x-axis on plots")
 )
 
 opt <- parse_args(OptionParser(option_list=option_list))
@@ -20,6 +24,11 @@ if(is.na(opt$out_directory)){
   stop("Path to output directory must be supplied")
 }
 
+# Check output folder exists or create
+if(!dir.exists(opt$out_directory)){
+  message("Creating output directory")
+  dir.create(opt$out_directory, recursive = TRUE)
+}
 suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(plyranges))
 suppressPackageStartupMessages(library(viridis))
@@ -61,15 +70,15 @@ summary_table <- divergence_eg_tes_gff %>%
                 -score, -phase, -TSTART, -TEND, -SHORTTE, -Matches,
                 -MISMATCHES, -TEGROUP, -LTRGROUP, -named_subclass, -type) %>%
   mutate(total_bp = sum(width),
-         mean_width = mean(width),
-         min_width = min(width),
-         max_width = max(width),
-         sd_width = sd(width),
+         mean_width = round(mean(width), digits = 2),
+         min_width = round(min(width), digits = 2),
+         max_width = round(max(width), digits = 2),
+         sd_width = round(sd(width), digits = 2),
          div = as.numeric(KIMURA80),
-         mean_div = mean(div),
-         min_div = min(div),
-         max_div = max(div),
-         sd_div = sd(div)
+         mean_div = round(mean(div), digits = 2),
+         min_div = round(min(div), digits = 2),
+         max_div = round(max(div), digits = 2),
+         sd_div = round(sd(div), digits = 2)
   ) %>%
   dplyr::select(-width, -div, -KIMURA80) %>%
   base::unique() %>%
@@ -112,7 +121,7 @@ subclass_kimura_plot <- kimura_plot + scale_y_continuous(expand = c(0.01,0), nam
 # Flip axis if desired
 if(opt$axis_flip == TRUE){
   subclass_kimura_plot <- subclass_kimura_plot +
-    scale_x_continuous(limits = c(-0.01, 0.51),
+    scale_x_continuous(limits = c(0.51, -0.01),
                        expand = c(0,0), name = "Kimura 2-Parameter Distance",
                        trans = "reverse")
 } else {
@@ -126,7 +135,7 @@ split_subclass_kimura_plot <- kimura_plot + scale_y_continuous(name = "Base pair
 # Flip axis if desired
 if(opt$axis_flip == TRUE){
   split_subclass_kimura_plot <- split_subclass_kimura_plot +
-    scale_x_continuous(limits = c(-0.01, 0.51),
+    scale_x_continuous(limits = c(0.51, -0.01),
                        expand = c(0,0), name = "Kimura 2-Parameter Distance",
                        trans = "reverse")
 } else {
@@ -196,16 +205,16 @@ kimura_superfamily_plot_4 <- ggplot(divergence_eg_tes_rounded_for_superfamily_pl
 # Flip axis if desired
 if(opt$axis_flip == TRUE){
   kimura_superfamily_plot_1 <- kimura_superfamily_plot_1 +
-    scale_x_continuous(limits = c(-0.01, 0.51),
+    scale_x_continuous(limits = c(0.51, -0.01),
                        expand = c(0,0), name = "", trans = "reverse")
   kimura_superfamily_plot_2 <- kimura_superfamily_plot_2 +
-    scale_x_continuous(limits = c(-0.01, 0.51),
+    scale_x_continuous(limits = c(0.51, -0.01),
                        expand = c(0,0), name = "", trans = "reverse")
   kimura_superfamily_plot_3 <- kimura_superfamily_plot_3 +
-    scale_x_continuous(limits = c(-0.01, 0.51),
+    scale_x_continuous(limits = c(0.51, -0.01),
                        expand = c(0,0), name = "", trans = "reverse")
   kimura_superfamily_plot_4 <- kimura_superfamily_plot_4 +
-    scale_x_continuous(limits = c(-0.01, 0.51), trans = "reverse",
+    scale_x_continuous(limits = c(0.51, -0.01), trans = "reverse",
                        expand = c(0,0), name = "Kimura 2-Parameter Distance")
 } else {
   kimura_superfamily_plot_1 <- kimura_superfamily_plot_1 +

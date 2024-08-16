@@ -23,4 +23,4 @@ if [ ! -f $GENOME ]; then
 fi
 
 python divergence_calc.py -l $LIBRARY -g $GENOME -i  $IN_GFF -o $OUT_GFF -t $THREADS
-Rscript divergence_plot.R -s $SPECIES_NAME -g $OUT_GFF -o $OUT_DIR
+Rscript divergence_plot.R -s $SPECIES_NAME -g $OUT_GFF -o $OUT_DIR -f
