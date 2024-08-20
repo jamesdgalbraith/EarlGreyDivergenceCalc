@@ -66,9 +66,7 @@ divergence_eg_tes_gff <- divergence_eg_tes_gff %>%
 summary_table <- divergence_eg_tes_gff %>%
   as_tibble %>%
   group_by(ID) %>%
-  dplyr::select(-seqnames, -start, -end, -strand, -source,
-                -score, -phase, -TSTART, -TEND, -SHORTTE, -Matches,
-                -MISMATCHES, -TEGROUP, -LTRGROUP, -named_subclass, -type) %>%
+  dplyr::select(width, KIMURA80, subclass, superfamily, ID) %>%
   mutate(total_bp = sum(width),
          mean_width = round(mean(width), digits = 2),
          min_width = round(min(width), digits = 2),
@@ -129,7 +127,7 @@ if(opt$axis_flip == TRUE){
     scale_x_continuous(limits = c(-0.01, 0.51),
                        expand = c(0,0), name = "Kimura 2-Parameter Distance")
 }
-ggsave(plot = subclass_kimura_plot, filename = paste0(out_directory, "/", species_name, "_subclass_div_plot.pdf"), device = "pdf", width = 12.85, height = 8.5)
+ggsave(plot = subclass_kimura_plot, filename = paste0(out_directory, "/", species_name, "_classification_landscape.pdf"), device = "pdf", width = 12.85, height = 8.5)
 
 split_subclass_kimura_plot <- kimura_plot + scale_y_continuous(name = "Base pairs", labels = function(x) format(x, scientific = TRUE)) + facet_grid(subclass~., scales = "free")
 # Flip axis if desired
@@ -143,7 +141,7 @@ if(opt$axis_flip == TRUE){
     scale_x_continuous(limits = c(-0.01, 0.51),
                        expand = c(0,0), name = "Kimura 2-Parameter Distance")
 }
-ggsave(plot = split_subclass_kimura_plot, filename = paste0(out_directory, "/", species_name, "_split_subclass_div_plot.pdf"), device = "pdf", width = 12.85, height = 8.5)
+ggsave(plot = split_subclass_kimura_plot, filename = paste0(out_directory, "/", species_name, "_split_class_landscape.pdf"), device = "pdf", width = 12.85, height = 8.5)
 
 # Perform maths for more divided plot
 divergence_eg_tes_rounded_for_superfamily_plot  <- divergence_eg_tes_gff %>%
@@ -173,6 +171,9 @@ kimura_superfamily_plot_1 <- ggplot(divergence_eg_tes_rounded_for_superfamily_pl
   scale_y_continuous(name = "Base pairs", labels = function(x) format(x, scientific = TRUE)) +
   facet_grid(subclass~., scales = "free") +
   guides(fill=guide_legend(ncol=3))
+if (inherits(try(ggplot_build(kimura_superfamily_plot_1)), "try-error")) 
+  kimura_superfamily_plot_1 <- ggplot()
+
 kimura_superfamily_plot_2 <- ggplot(divergence_eg_tes_rounded_for_superfamily_plot$LINE,
                                     aes(x = KIMURA80, y = KIMURA_SUM, fill = superfamily)) +
   geom_col(position = "stack", width = 0.01, colour = "black", linewidth = 0.2) +
@@ -182,6 +183,9 @@ kimura_superfamily_plot_2 <- ggplot(divergence_eg_tes_rounded_for_superfamily_pl
   facet_grid(subclass~., scales = "free") +
   guides(fill=guide_legend(ncol=3)) +
   scale_fill_brewer(palette = "Blues", direction = -1)
+if (inherits(try(ggplot_build(kimura_superfamily_plot_2)), "try-error")) 
+  kimura_superfamily_plot_2 <- ggplot()
+                     
 kimura_superfamily_plot_3 <- ggplot(divergence_eg_tes_rounded_for_superfamily_plot$LTR,
                                     aes(x = KIMURA80, y = KIMURA_SUM, fill = superfamily)) +
   geom_col(position = "stack", width = 0.01, colour = "black", linewidth = 0.2) +
@@ -191,6 +195,9 @@ kimura_superfamily_plot_3 <- ggplot(divergence_eg_tes_rounded_for_superfamily_pl
   facet_grid(subclass~., scales = "free") +
   guides(fill=guide_legend(ncol=3)) +
   scale_fill_brewer(palette = "Greens", direction = -1)
+if (inherits(try(ggplot_build(kimura_superfamily_plot_3)), "try-error")) 
+  kimura_superfamily_plot_3 <- ggplot()
+
 kimura_superfamily_plot_4 <- ggplot(divergence_eg_tes_rounded_for_superfamily_plot$SINE,
                                     aes(x = KIMURA80, y = KIMURA_SUM, fill = superfamily)) +
   geom_col(position = "stack", width = 0.01, colour = "black", linewidth = 0.2) +
@@ -200,8 +207,9 @@ kimura_superfamily_plot_4 <- ggplot(divergence_eg_tes_rounded_for_superfamily_pl
   facet_grid(subclass~., scales = "free") +
   guides(fill=guide_legend(ncol=3)) +
   scale_fill_brewer(palette = "YlOrRd", direction = -1)
+if (inherits(try(ggplot_build(kimura_superfamily_plot_4)), "try-error")) 
+  kimura_superfamily_plot_4 <- ggplot()
 
-# flip axis if desired
 # Flip axis if desired
 if(opt$axis_flip == TRUE){
   kimura_superfamily_plot_1 <- kimura_superfamily_plot_1 +
