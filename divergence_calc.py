@@ -35,6 +35,9 @@ args = parser.parse_args()
 def file_check(repeat_library, in_gff, genome, out_gff, temp_dir):
     if(exists(repeat_library) == False or exists(in_gff) == False or exists(genome) == False):
         sys.exit('Files not found. Requires the repeat library, path to the genome, and path to gff containing coordinates and corresponding repeat files')
+    if(exists(genome+".fai") == False):
+        print("Indexing genome")
+        subprocess.run(["samtools","faidx",genome], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     if(exists(temp_dir) == False):
         os.mkdir(temp_dir)
     if(exists(temp_dir+"/qseqs") == False):
