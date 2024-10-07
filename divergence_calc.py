@@ -237,7 +237,7 @@ if __name__ == "__main__":
     calc_gff = tmp_out_parser(results, simple_gff, other_gff)
         
     # write to file
-    calc_gff.to_csv(args.out_gff, sep = "\t", header = False, index=False)
+    calc_gff.drop(columns = ['index']).to_csv(args.out_gff, sep = "\t", header = False, index=False)
 
     # print run time for number of rows
     run_time = time() - start_time
