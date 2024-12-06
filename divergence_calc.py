@@ -91,13 +91,15 @@ def Kimura80(qseq, sseq):
         if i+j in transversions: tv+=1
     # count number of bp which align (excludes gaps, Ns)
     aln_len = m + ts + tv
-    # calculate p and q 
-    p = ts/aln_len
-    q = tv/aln_len
-    
-    # calculate Kimura distance
-    Kimura_dist = -0.5 * log((1 - 2*p - q) * sqrt( 1 - 2*q ))
-    
+    if aln_len != 0:
+        # calculate p and q 
+        p = ts/aln_len
+        q = tv/aln_len
+        # calculate Kimura distance
+        Kimura_dist = -0.5 * log((1 - 2*p - q) * sqrt( 1 - 2*q ))
+    else:
+        Kimura_dist = "NA"
+      
     return(Kimura_dist)
 
 def outer_func(genome_path, temp_dir, timeoutSeconds, gff):
@@ -154,9 +156,10 @@ def outer_func(genome_path, temp_dir, timeoutSeconds, gff):
                     # Calculate distances based on model
                     Kdist = Kimura80(ref_seq, gen_seq)
                     # Convert numbers to strings
-                    Kdist = str(round(Kdist, 4))
+                    if Kdist != "NA":
+                      Kdist = str(round(Kdist, 4))
                 else:
-                    Kdist = "NA"
+                    Kdist = "NA"              
                 # Delete temporary files
                 os.remove(query_path+".water")
                 os.remove(query_path)
