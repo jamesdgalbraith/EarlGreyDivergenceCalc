@@ -91,21 +91,26 @@ def Kimura80(qseq, sseq):
         if i+j in transversions: tv+=1
     # count number of bp which align (excludes gaps, Ns)
     aln_len = m + ts + tv
-    # calculate p and q 
-    p = ts/aln_len
-    q = tv/aln_len
+
+    # if aln_len is > 0 calculate Kdist
+    if aln_len != 0:
+        # calculate p and q 
+        p = ts/aln_len
+        q = tv/aln_len
     
-    # calculate Kimura distance
-    Kimura_dist = -0.5 * log((1 - 2*p - q) * sqrt( 1 - 2*q ))
+        # calculate Kimura distance
+        Kimura_dist = -0.5 * log((1 - 2*p - q) * sqrt( 1 - 2*q ))
+    else:
+        Kimura_dist = "NA"
     
-    return(Kimura_dist)
+    return(Kimura_dist, aln_len)
 
 def outer_func(genome_path, temp_dir, timeoutSeconds, gff):
     generated_name = file_name_generator()
     holder_file_name = temp_dir+generated_name
     failed_file_name = temp_dir+"failed_"+generated_name
     with open(holder_file_name, 'w') as tmp_out:
-        header = list(gff.columns.values)[1:] + ["Kimura"]
+        header = list(gff.columns.values)[1:] + ["Kimura", "aln_len"]
         header = "\t".join(header)+"\n"
         tmp_out.write(header)
         for row in gff.iterrows():
@@ -152,17 +157,19 @@ def outer_func(genome_path, temp_dir, timeoutSeconds, gff):
                 # Check ref and genome sequence are same length, set Kdist to NA if not
                 if len(ref_seq) == len(gen_seq):
                     # Calculate distances based on model
-                    Kdist = Kimura80(ref_seq, gen_seq)
+                    Kdist, aln_len = Kimura80(ref_seq, gen_seq)
                     # Convert numbers to strings
                     Kdist = str(round(Kdist, 4))
+                    aln_len = str(aln_len)
                 else:
                     Kdist = "NA"
+                    aln_len = "0"
                 # Delete temporary files
                 os.remove(query_path+".water")
                 os.remove(query_path)
             # Make line for temporary file and write to file
             tmp_holder = row[1].to_list()[1:]
-            tmp_holder = "\t".join(str(x) for x in tmp_holder)+"\t"+Kdist+"\n"
+            tmp_holder = "\t".join(str(x) for x in tmp_holder)+"\t"+Kdist+"\t"+aln_len+"\n"
             tmp_out.write(tmp_holder)
 
     return(holder_file_name)
@@ -178,7 +185,7 @@ def tmp_out_parser(file_list, simple_gff, other_gff):
     # Convert numbers to strings for concatenation
     gff['Kimura'] = gff['Kimura'].astype(str)
     # Convert new data onto metadata
-    gff['metadata'] = gff['metadata'] + ";KIMURA80=" + gff['Kimura']
+    gff['metadata'] = gff['metadata'] + ";aln_len=" + gff['aln_len']+ ";KIMURA80=" + gff['Kimura']
     # Remove unnecessary rows
     gff = gff.drop(columns = ['Kimura', 'repeat_family'])
     # Combine columns, sort and drop unneccessary columns
